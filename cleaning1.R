@@ -151,3 +151,58 @@ print(sens)
 
 spec = length(correct[correct == "Declined"])/ length(which(forest_test$LoanStatus == "Declined"))
 print(spec)
+
+
+######################################################################## boosting
+install.packages("gbm")
+library(gbm)
+
+
+
+set.seed(100)
+
+# remove Loan number and AppReceiveDate
+boostdata = subset(training, select = -c(LoanNumber,AppReceiveDate))
+
+# randomly select 50,000 observations for training set 
+ind = sample(seq_len(nrow(boostdata)), size = 50000)
+boost_train = boostdata[ind,]
+
+# remaining observations are test set 
+boost_test = boostdata[-ind,]
+
+
+# change response to 0/1 (1 is Approved)
+boost_train$response = ifelse(boost_train$LoanStatus == "Approved", 
+                              1, 0)
+boost_train = subset(boost_train, select = -c(LoanStatus))
+
+# model
+mod_gb <- gbm(response ~ ., distribution = "bernoulli", data = boost_train, n.trees = 1000, shrinkage = .1, cv.folds = 10, interaction.depth = 3)
+
+
+# predict on test set 
+pred = predict(mod_gb, boost_test, 1000)
+
+# predictions are in form of log likelihood so anything prediction less than zero is Declined
+predlabels = ifelse(pred < 0, "Declined", "Approved")
+
+# percent of test obs that were correctly predicted  
+accuracy = sum(predlabels == boost_test$LoanStatus)/length(predlabels)
+accuracy
+
+
+### shrinkage = .1 , ntrees = 400 accuracy = .796
+
+### shrinkage = .1, ntree = 400 accuracy = .84
+
+### shrinkage = .1, ntree = 500 accruacy = .84
+
+### shrinkage = .1 ntree = 1000 accuracy = .854
+
+## shrinkage = .1 ntree = 1000 accuracy = .858
+
+## shrinkage = .1 ntre = 1000 depth = 2  accuracy = .869
+
+## shrinkage = .1 ntree = 1000 depth = 3  accuracy = .872
+
